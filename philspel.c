@@ -70,7 +70,17 @@ int main(int argc, char **argv) {
  */
 unsigned int stringHash(void *s) {
   char *string = (char *)s;
-  // -- TODO --
+  unsigned int val = 0;
+  
+  // Add up all digits of a string using base-26
+  // All in lowercase
+  for (int i = 0; string[i]; i++)
+  {
+    char c = tolower(string[i]);
+    val = val*26 + c - 'a';
+  }
+
+  return val;
 }
 
 /*
@@ -80,27 +90,101 @@ unsigned int stringHash(void *s) {
 int stringEquals(void *s1, void *s2) {
   char *string1 = (char *)s1;
   char *string2 = (char *)s2;
-  // -- TODO --
+  return !strcmp(string1, string2);
 }
 
 /*
- * This function should read in every word from the dictionary and
+ * This function should read in every buffer from the dictionary and
  * store it in the hash table.  You should first open the file specified,
  * then read the words one at a time and insert them into the dictionary.
  * Once the file is read in completely, return.  You will need to allocate
- * (using malloc()) space for each word.  As described in the spec, you
- * can initially assume that no word is longer than 60 characters.  However,
+ * (using malloc()) space for each buffer.  As described in the spec, you
+ * can initially assume that no buffer is longer than 60 characters.  However,
  * for the final 20% of your grade, you cannot assumed that words have a bounded
  * length.  You CANNOT assume that the specified file exists.  If the file does
  * NOT exist, you should print some message to standard error and call exit(1)
  * to cleanly exit the program.
  *
- * Since the format is one word at a time, with new lines in between,
+ * Since the format is one buffer at a time, with new lines in between,
  * you can safely use fscanf() to read in the strings until you want to handle
- * arbitrarily long dictionary chacaters.
+ * arbitrarily long dictionary characters.
  */
 void readDictionary(char *dictName) {
-  // -- TODO --
+  FILE * dict;
+  dict = fopen(dictName, "r");
+
+  if (dict == NULL)
+  {
+    fprintf(stderr, "Reading Failure! File does not exist!\n");
+    exit(1);
+  }
+
+  // Try to read in words
+  const size_t INITIAL_CAP = 64;
+  size_t CURRENT_CAP = INITIAL_CAP;
+
+  char *buffer = malloc(INITIAL_CAP);
+  char *word = malloc(INITIAL_CAP);
+  if (buffer == NULL)
+  {
+    fprintf(stderr, "Malloc Failure! Not enough memory!\n");
+    exit(1);
+  }
+
+  // Using fgets to safely read in the words
+  size_t current_len = 0;
+  while (fgets(buffer, CURRENT_CAP, dict) != NULL)
+  {
+    size_t buffer_len = strlen(buffer);
+    
+    // Expand the size if not big enough
+    if (current_len + buffer_len + 1 > CURRENT_CAP)
+    {
+      // Use realloc if not enough room
+      size_t NEW_CAP = CURRENT_CAP*2 + 1;
+      char *new_word = realloc(word, NEW_CAP);
+
+      // Note for memory allocation failure
+      if (new_word == NULL)
+      {
+        fprintf(stderr, "Realloc Failure! Not enough memory!\n");
+        exit(1);
+      }
+
+      word = new_word;
+      CURRENT_CAP = NEW_CAP;
+    }
+
+    strcpy(word+current_len, buffer);
+    current_len += buffer_len;
+  }
+
+  // Now word stores all words
+  // Split them using strtok
+
+  char * pch;
+  pch = strtok (word,"\n");
+  if (pch == NULL)
+  {
+    fprintf(stderr, "No words!\n");
+    exit(1);
+  }
+  while (pch != NULL)
+  {
+    //printf ("%s\n",pch);
+    // Insert the word into hash table
+    const size_t string_length = strlen(pch);
+    char * word_repo = malloc(string_length);
+    strcpy(word_repo, pch);
+    insertData(dictionary, (void *)word_repo, (void *)word_repo);
+    
+    pch = strtok (NULL, "\n");
+  }
+
+
+  free(buffer);
+
+  fclose(dict);
 }
 
 /*
@@ -119,11 +203,86 @@ void readDictionary(char *dictName) {
  * whitespace as breaking strings), meaning you will probably have
  * to get characters from stdin one at a time.
  *
- * Do note that even under the initial assumption that no word is longer than 60
+ * Do note that even under the initial assumption that no buffer is longer than 60
  * characters, you may still encounter strings of non-alphabetic characters (e.g.,
  * numbers and punctuation) which are longer than 60 characters. Again, for the 
  * final 20% of your grade, you cannot assume words have a bounded length.
  */
 void processInput() {
-  // -- TODO --
+  char current_word[64] = "";
+  int idx = 0;
+  char c;
+  char* sic = " [sic]";
+
+  while ((c = getchar()) != EOF)
+  {
+    if (isalpha(c))
+    {
+      putchar(c);
+      current_word[idx++] = c;
+    }
+    else
+    {
+      // Output " [sic]" if not in the dictionary
+      if (!isInDictionary(dictionary, current_word))
+      {
+        fprintf(stdout, "%s", sic);
+      }
+
+      putchar(c);
+
+      // Proceed to the next word
+      while ((c = getchar()) != EOF && !isalpha(c)) {
+        putchar(c);
+      }
+
+      if (c != EOF)
+      {
+        // Reset the word buffer
+        memset(current_word, '\0', sizeof(current_word));
+        current_word[0] = c;
+        idx = 1;
+        putchar(c);
+      }
+    }
+  }
+
+  // Handle the last word with care
+  if (!isInDictionary(dictionary, current_word))
+    {
+      fprintf(stdout, "%s", sic);
+    }
+
+}
+
+
+int isInDictionary(HashTable *dictionary, char *word)
+{
+  int case1 = 0;
+  int case2 = 0;
+  int case3 = 0;
+  if (findData(dictionary, word) != NULL)
+  {
+    case1 = 1;
+  }
+
+  char *tmp = malloc(64);
+  strcpy(tmp, word);
+  size_t LEN = strlen(word);
+  for (int i = 1; i < LEN; i++)
+  {
+    tmp[i] = tolower(word[i]);
+  }
+  if (findData(dictionary, tmp) != NULL)
+  {
+    case2 = 1;
+  }
+  tmp[0] = tolower(tmp[0]);
+  if (findData(dictionary, tmp) != NULL)
+  {
+    case3 = 1;
+  }
+
+  free(tmp);
+  return case1+case2+case3;
 }

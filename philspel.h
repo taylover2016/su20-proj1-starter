@@ -9,6 +9,8 @@ extern int stringEquals(void *s1, void *s2);
 
 extern void readDictionary(char *dictName);
 
+extern int isInDictionary(HashTable *dictionary, char *word);
+
 extern void processInput();
 
 #endif
